@@ -2,7 +2,7 @@
 
 **Version:** 1.0  
 **Date:** March 23, 2026  
-**Status:** Discovery Phase - Pending User Clarification  
+**Status:** ✅ **DECISIONS FINALIZED - Phase 1: Indonesia Launch**  
 **Stakeholders:** Adit (Product Owner)
 
 ---
@@ -12,21 +12,21 @@
 ### Project Overview
 A web-based multiplayer Mahjong platform enabling real-time competitive and social gameplay between players worldwide. The platform prioritizes accessibility, social connection, and authentic gameplay experience.
 
-### Key Questions Requiring Immediate Decision
-**⚠️ CRITICAL DECISIONS BLOCKING SPECIFICATION:**
+### Key Decisions (CONFIRMED)
+**✅ CRITICAL DECISIONS FINALIZED:**
 
-| Question | Options | Recommendation | Impact |
-|----------|---------|----------------|--------|
-| **Mahjong Variant** | Riichi / HK Old Style / Classical | **TBD by user** | Rules engine, target market, UX complexity |
-| **Monetization** | Cosmetics / Subscription / Gambling-adjacent | **TBD by user** | Legal compliance, architecture, features |
-| **Primary Audience** | Social / Competitive / Learners | **TBD by user** | Feature prioritization, UX design, marketing |
-| **Geographic Focus** | Global / Asia-first / Western | **TBD by user** | Localization, regulations, latency |
-| **AI Opponents** | Yes / No / Phase 2 | **TBD by user** | Scope, ML requirements, timeline |
+| Question | Decision | Notes |
+|----------|----------|-------|
+| **Mahjong Variant** | **Hong Kong (HK) Old Style** | Most straightforward; other variants deferred indefinitely |
+| **Monetization** | **Ads + Subscription** (remove ads) | Cosmetics Phase 3; Gacha mechanics possible Phase 3; **NO gambling** |
+| **Primary Audience** | **Social players** (all ages) | Indonesia → SEA → Global rollout |
+| **Geographic Focus** | **Phase 1: Indonesia** → Phase 2: SEA → Phase 3: Global | WhatsApp integration critical for IDN |
+| **AI Opponents** | **Phase 2** | Not required for MVP |
 
-### Proposed Scope (Subject to Confirmation)
-- **Phase 1:** Single variant, real-time 4-player, web-only, cosmetics monetization
-- **Phase 2:** Mobile apps, AI opponents, additional variants
-- **Phase 3:** Tournament system, ranked competitive, spectator mode
+### Proposed Scope (Confirmed)
+- **Phase 1 (Indonesia Focus):** HK Mahjong only, real-time 4-player, web-only, Ads + Subscription monetization, WhatsApp sharing, IDN/EN localization
+- **Phase 2:** SEA expansion, AI opponents for practice
+- **Phase 3:** Global launch, cosmetics/Gacha, tournament system
 
 ---
 
@@ -165,49 +165,109 @@ Western markets lack quality competitive Mahjong platforms with:
 
 ---
 
-## 5. Technical Architecture
+## 5. Technical Architecture (CONFIRMED)
 
-### Architecture Overview
-**Server-Authoritative Real-Time Game System**
+### Tech Stack (Final Decision)
 
+| Layer | Technology | Rationale |
+|-------|------------|-----------|
+| **Frontend** | React + TypeScript | Type safety, component reusability |
+| **Build Tool** | Vite | Faster dev/build vs CRA |
+| **State Management** | Zustand | Lightweight, perfect for game state |
+| **API/Data** | TanStack Query (React Query) | Sync with backend, caching |
+| **Styling** | Tailwind CSS | Rapid UI dev, social menus |
+| **Animations** | Framer Motion | Tile draw/discard/Pong/Chi effects |
+| **Icons** | Lucide React | Clean, lightweight |
+| **Backend** | Go (Golang) | Performance, concurrency |
+| **Database** | PostgreSQL + Redis | Persistence + session/cache |
+| **Hosting** | Vercel/Netlify (FE), Singapore region (BE) | Low latency for IDN users |
+
+### TypeScript Game State Interface
+
+```typescript
+// Core tile definition for HK Mahjong
+type TileSuit = 'Dots' | 'Bamboo' | 'Characters' | 'Winds' | 'Dragons';
+type Wind = 'East' | 'South' | 'West' | 'North';
+type Dragon = 'Red' | 'Green' | 'White';
+
+interface MahjongTile {
+  id: string;           // Unique instance ID
+  suit: TileSuit;
+  value: number;        // 1-9 for suits, 1-4 for winds
+  name: string;         // Display name
+}
+
+interface Player {
+  id: string;
+  username: string;
+  hand: MahjongTile[];      // Concealed tiles (13-14)
+  exposed: Meld[];          // Called melds (Pon/Chi/Kong)
+  windSeat: Wind;           // Current seat wind
+  score: number;
+  isReady: boolean;
+  isDisconnected: boolean;
+}
+
+interface Meld {
+  type: 'Pon' | 'Chi' | 'Kong' | 'ConcealedKong';
+  tiles: MahjongTile[];
+  claimedFrom?: string;     // Player ID if claimed discard
+}
+
+interface GameState {
+  gameId: string;
+  status: 'waiting' | 'playing' | 'paused' | 'finished';
+  currentRound: number;     // 1-4 (East 1-4, South 1-4, etc.)
+  prevailingWind: Wind;
+  currentTurn: string;      // Player ID
+  wall: MahjongTile[];      // Undrawn tiles
+  deadWall: MahjongTile[];  // Reserved tiles (if needed for HK)
+  discardPile: { tile: MahjongTile; playerId: string }[];
+  players: Player[];
+  lastAction?: GameAction;
+  timerSeconds: number;     // Turn timer
+}
+
+type GameAction =
+  | { type: 'DRAW'; playerId: string; tile: MahjongTile }
+  | { type: 'DISCARD'; playerId: string; tile: MahjongTile }
+  | { type: 'PON'; playerId: string; tiles: MahjongTile[]; fromPlayerId: string }
+  | { type: 'CHI'; playerId: string; tiles: MahjongTile[]; fromPlayerId: string }
+  | { type: 'KONG'; playerId: string; tiles: MahjongTile[] }
+  | { type: 'WIN'; playerId: string; hand: MahjongTile[]; winningTile: MahjongTile; points: number };
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   React SPA     │────▶│   Node.js API    │────▶│   PostgreSQL    │
-│  (Game Client)  │     │   (REST + WS)    │     │  (Game State)   │
-└────────┬────────┘     └────────┬─────────┘     └─────────────────┘
-         │                     │
-         │              ┌──────▼──────┐
-         │              │   Redis     │
-         └──────────────│  (Session,   │
-              WS       │   Cache, LB)  │
-                       └─────────────┘
-```
 
-### Tech Stack Recommendations
+### Scoring (HK Old Style)
+- **Minimum:** 3 fan to win (or 1 fan depending on house rules)
+- **Common Patterns:**
+  - **Pong/Pong Hand:** All triplets (3 fan)
+  - **All Terminals & Honors:** Only 1/9 suits + winds/dragons (3 fan)
+  - **All Honors:** Only winds + dragons (huge fan)
+  - **All Terminals:** Only 1/9 tiles (huge fan)
+  - **Seven Pairs:** 7 pairs instead of 4 melds + pair (4 fan)
+  - **Pure Straight:** 1-9 of same suit (1 fan)
+  - **Mixed Straight:** 1-9 across suits (1 fan)
+  - **Common Hand:** 4 chows + pair, no honors (1 fan)
 
-**Option A: JavaScript/TypeScript (Recommended for MVP)**
-- **Frontend:** React + TypeScript + Tailwind CSS
-- **Backend:** Node.js + Express + Socket.io
-- **Database:** PostgreSQL (persistent) + Redis (cache/session)
-- **Hosting:** Railway/Render (backend), Vercel (frontend)
-- **Pros:** Fastest time to market, good real-time ecosystem, full-stack TypeScript
-- **Cons:** Single-threaded for game logic (mitigated with Redis Queue)
+### Infrastructure (Indonesia-Optimized)
 
-**Option B: Go + React**
-- **Frontend:** React + TypeScript
-- **Backend:** Go + WebSocket library
-- **Database:** PostgreSQL + Redis
-- **Pros:** Better performance, type-safe, excellent for concurrent games
-- **Cons:** Slower development, smaller talent pool
+| Component | Provider | Region | Notes |
+|-----------|----------|--------|-------|
+| Frontend | Vercel/Netlify | Global CDN | Edge caching |
+| Backend API | AWS/GCP | Singapore (ap-southeast-1) | <30ms to Jakarta |
+| WebSocket | Same as API | Singapore | Game state sync |
+| Database | AWS RDS/GCP Cloud SQL | Singapore | Primary |
+| Cache | Redis (ElastiCache/Memorystore) | Singapore | Sessions, game state |
+| Media | Cloudflare R2/S3 | Global | Avatars, assets |
 
-**Option C: Elixir/Phoenix**
-- **Frontend:** Phoenix LiveView + React
-- **Backend:** Elixir + Phoenix
-- **Database:** PostgreSQL
-- **Pros:** Built for real-time, fault-tolerant, hot code reloading
-- **Cons:** Niche language, hiring difficulty
+### Latency Targets (Indonesia)
 
-**Decision:** Start with Option A (Node.js) for speed, migrate to Option B (Go) if scale requires it.
+| Metric | Target | Max |
+|--------|--------|-----|
+| Jakarta → Server | <30ms | 50ms |
+| State broadcast | <100ms | 200ms |
+| Reconnection | <2s | 5s |
+| Matchmaking (IDN) | <15s | 30s |
 
 ### Game State Management
 
@@ -524,69 +584,99 @@ Leaderboard check
 
 ---
 
-## 9. Monetization Strategy
+## 9. Monetization Strategy (CONFIRMED)
 
-### ⚠️ MONETIZATION DECISION REQUIRED
+### Revenue Model: Ads + Subscription
 
-**Option A: Freemium + Cosmetics (RECOMMENDED - LOW RISK)**
+| Feature | Free Tier | Premium (Subscription) |
+|---------|-----------|------------------------|
+| **Play games** | Unlimited | Unlimited |
+| **Private tables** | ✅ | ✅ |
+| **Matchmaking** | ✅ | ✅ |
+| **Ads** | Banner + Interstitial | **No ads** |
+| **Cosmetics** | Basic only | Full access (Phase 3) |
+| **Advanced stats** | Basic | Detailed analytics |
+| **Priority support** | - | ✅ |
 
-| Feature | Free | Paid |
-|---------|------|------|
-| Play games | Unlimited | - |
-| Ranked mode | Yes | - |
-| Basic avatars | 5 | - |
-| Premium avatars | - | Unlock |
-| Tile themes | Standard | Premium skins |
-| Table backgrounds | Default | Custom themes |
-| Special effects | Basic | Premium animations |
-| Statistics | Basic | Advanced analytics |
+### Pricing (Indonesia-Adjusted)
 
-**Revenue Model:**
-- Direct purchase: $1-10 per cosmetic item
-- Bundles: $5-20
-- Season pass: $10-15 quarterly
+| Market | Monthly | Annual (Discount) |
+|--------|---------|-------------------|
+| Indonesia | Rp 29,000 (~$1.90) | Rp 249,000 (~$16) |
+| SEA/Global | $2.99 | $24.99 |
 
-**Pros:** 
-- No gambling laws to navigate
-- Broad appeal
-- Proven model (Mahjong Soul)
-**Cons:** 
-- Requires large user base
-- Lower ARPU than gambling
+### Ad Strategy
 
-**Estimated ARPU:** $5-15/year per user
+| Placement | Frequency | Type |
+|-----------|-----------|------|
+| Post-match | Every 3 games | Interstitial (5s skip) |
+| Menu screens | Always | Banner (bottom) |
+| Waiting lobby | During queue | Native/native video |
 
----
+**Rules:**
+- ✅ Non-intrusive, skippable ads
+- ✅ No ads during active gameplay
+- ✅ Frequency capped (max 1 interstitial per 5 min)
 
-**Option B: Subscription Model**
+### Phase 3 Expansion (Future)
 
-| Feature | Free | Premium ($5/month) |
-|---------|------|---------------------|
-| Casual games | Unlimited | Unlimited |
-| Ranked games | 5/day | Unlimited |
-| Ads | Yes | No |
-| Advanced stats | No | Yes |
-| Tournament entry | No | Included |
-| Priority support | No | Yes |
+| Feature | Description | Model |
+|---------|-------------|-------|
+| **Cosmetics** | Tile themes, table backgrounds, avatars, effects | Direct purchase |
+| **Gacha** | Cosmetic loot boxes (if legal/regional) | Random draw |
+| **Battle Pass** | Seasonal progression with rewards | One-time purchase |
 
-**Pros:**
-- Predictable revenue
-- Loyal user base
-- No pay-to-win concerns
-**Cons:**
-- Limits user base
-- Requires strong value proposition
-
-**Estimated ARPU:** $30-60/year (assuming 20% conversion)
+**⚠️ STRICTLY PROHIBITED:**
+- ❌ Real money wagering
+- ❌ Gambling mechanics in core gameplay
+- ❌ Pay-to-win advantages
 
 ---
 
-**Option C: Hybrid (Cosmetics + Optional Subscription)**
+## 10. Phase 1 MVP Features (Indonesia Launch)
 
-**Pros:** 
-- Multiple revenue streams
-- Flexibility for different user types
-**Cons:** 
+### Core Gameplay
+- [ ] **HK Ruleset:** 3 fan minimum, standard HK scoring
+- [ ] **4-player tables:** Real-time multiplayer
+- [ ] **Private rooms:** 6-digit code, password optional
+- [ ] **Turn timer:** 20s per turn (configurable by host)
+
+### Social Features
+- [ ] **WhatsApp sharing:** One-tap invite to rooms
+- [ ] **In-game emotes:** 10+ preset reactions (😂 🤔 🔥 etc.)
+- [ ] **Global chat:** Lobby chat with moderation
+- [ ] **Friend system:** Add players, see online status
+
+### Authentication
+- [ ] **Google Sign-In:** Primary method
+- [ ] **Phone/WhatsApp OTP:** Alternative (if API available)
+- [ ] **Guest play:** 3 games before registration required
+
+### Monetization
+- [ ] **Ad integration:** Banner + interstitial (Google AdMob/AdSense)
+- [ ] **Subscription:** Remove ads + basic stats
+- [ ] **Payment:** Local methods (GoPay, OVO, Dana, LinkAja)
+
+### Localization
+- [ ] **Bahasa Indonesia:** Full UI translation
+- [ ] **English:** Fallback/default
+- [ ] **Cultural:** Localized emotes, chat phrases
+
+### Technical
+- [ ] **Web-first:** PWA installable
+- [ ] **Singapore backend:** <30ms latency to Jakarta
+- [ ] **Offline detection:** Graceful handling
+- [ ] **Reconnection:** Resume dropped games
+
+### Out of Scope (Phase 2+)
+- ❌ AI opponents
+- ❌ Ranked/ELO system
+- ❌ Cosmetics shop
+- ❌ Tournament system
+- ❌ Voice chat
+- ❌ Multiple variants
+
+---
 - More complex pricing communication
 
 **Estimated ARPU:** $10-25/year blended
