@@ -1,163 +1,229 @@
 # Coder Agent Analysis: Multiplayer Mahjong Website
 
-## Introduction
-I'm the Coder Agent focused on technical feasibility, architecture decisions, and implementation constraints.
+## Status: ✅ DECISIONS FINALIZED
 
-## Critical Clarifying Questions
+This document reflects confirmed decisions from Product Owner (Adit) as of March 23, 2026.
 
-### 1. Mahjong Variant Selection
-**Question:** Which Mahjong variant should we prioritize?
+---
 
-**Technical Implications:**
-- **Hong Kong Old Style:** Simplest rules, fastest games (~10-15 min), easiest to implement
-- **Japanese Riichi:** Most complex (riichi declarations, furiten rules, dora indicators), requires sophisticated validation
-- **Chinese Classical:** Traditional rules, longer games, more scoring complexity
-- **American Mahjong:** Uses Jokers, Charleston phase, very different tile set
+## Confirmed Technical Decisions
 
-**My Recommendation:** Start with Hong Kong Old Style - it has the simplest rule set while still being authentic, making MVP delivery faster and debugging easier.
+### 1. Mahjong Variant: Hong Kong Old Style ✅
 
-### 2. Real-Time vs Async Architecture
-**Question:** Real-time synchronous play only, or async option?
+**Decision:** Hong Kong Old Style ONLY for Phase 1. Other variants deferred indefinitely.
 
 **Technical Implications:**
-- **Synchronous:** Requires WebSocket infrastructure, presence management, reconnection handling
-- **Async:** Can use polling/HTTP, simpler state machine, longer game sessions (hours/days)
-- **Hybrid:** Most complex but flexible
+- ✅ Simplest rules, fastest implementation
+- ✅ 10-15 min game duration (perfect for mobile/web)
+- ✅ Scoring based on "fan" system (3 fan minimum to win)
+- ✅ No riichi declarations, furiten, or complex Japanese rules
 
-**Concerns:**
-- Async Mahjong loses the "social" aspect that makes the game engaging
-- Real-time requires handling network latency, disconnections, rejoining mid-game
-- Turn timer handling (what happens when a player AFKs?)
+**Key Rules to Implement:**
+- 136 tiles (no flowers/seasons for MVP)
+- 3 fan minimum to declare win
+- Standard patterns: Pong/Pong hand (3 fan), All Terminals & Honors (3 fan), Seven Pairs (4 fan), Pure Straight (1 fan), Common Hand (1 fan)
 
-### 3. Platform Strategy
-**Question:** Web-only or mobile app required?
+### 2. Platform: Web-First with PWA ✅
 
-**Technical Implications:**
-- **Web-only:** Faster MVP, single codebase, instant deployment, but limited offline support
-- **PWA:** Good middle ground, offline support, push notifications
-- **Native apps:** Best UX, app store distribution, but 3x development cost
+**Decision:** Web-only for Phase 1, PWA installable. Native apps deferred.
 
-**My Recommendation:** Start web-only with PWA features for mobile-like experience.
+**Stack Confirmed:**
+| Layer | Technology |
+|-------|------------|
+| Frontend | React + TypeScript |
+| Build | Vite |
+| State | Zustand |
+| API/Data | TanStack Query (React Query) |
+| Styling | Tailwind CSS |
+| Animations | Framer Motion |
+| Icons | Lucide React |
+| Backend | Go (Golang) |
+| DB | PostgreSQL + Redis |
+| Hosting | Vercel/Netlify (FE), Singapore region (BE) |
 
-### 4. Authentication Strategy
-**Question:** Guest play vs registered users only?
+### 3. Audience & Geography: Indonesia First ✅
 
-**Technical Implications:**
-- Guest play reduces friction but creates challenges:
-  - ELO/ranking systems need persistent identity
-  - Report/ban systems need identity
-  - Progression systems don't work
-- Registered-only ensures accountability but increases drop-off
-
-**My Recommendation:** Guest play allowed but with heavy limitations (no ranked, limited tables), must convert to register for full features.
-
-### 5. AI Opponents
-**Question:** Include AI for practice/single-player?
+**Decision:** Phase 1 = Indonesia only. Phase 2 = SEA. Phase 3 = Global.
 
 **Technical Implications:**
-- Mahjong AI is computationally expensive (hidden information, probabilistic decisions)
-- Simple rule-based AI is doable but won't be challenging
-- Strong AI requires ML/neural networks (Mahjong Soul uses deep learning)
-- Resource requirements for AI inference
+- Backend hosted in Singapore (AWS/GCP `ap-southeast-1`)
+- Target latency: <30ms Jakarta → Server
+- Localization: Bahasa Indonesia + English
+- WhatsApp sharing integration (critical for IDN market)
+- Local payment methods: GoPay, OVO, Dana, LinkAja
 
-**Concerns:**
-- Do we have ML expertise?
-- What's the compute budget?
-- Is single-player mode a priority or nice-to-have?
+### 4. Authentication: Google + Phone/WhatsApp OTP ✅
 
-### 6. Ranking & Competitive Systems
-**Question:** Ranking/ELO system? Tournaments?
+**Decision:** 
+- Primary: Google Sign-In
+- Alternative: Phone/WhatsApp OTP
+- Guest play: 3 games before registration required
 
-**Technical Implications:**
-- **ELO:** Requires matchmaking algorithms, rating calculations, decay systems
-- **Tournaments:** Complex bracket management, registration systems, prize distribution
-- **Leaderboards:** Database query optimization for real-time updates
+### 5. AI Opponents: Phase 2 ✅
 
-**Open Questions:**
-- Is this competitive or social-focused?
-- How serious is the ranking system?
-- What about smurf detection and boosting prevention?
+**Decision:** NO AI for MVP. Focus on real multiplayer first.
 
-### 7. Gambling & Legal Considerations
-**Question:** In-game currency? Real money gambling?
+### 6. Monetization: Ads + Subscription ✅
 
-**CRITICAL LEGAL CONCERNS:**
-- **Real money gambling:** Requires gambling licenses ( varies by jurisdiction)
-- **Social casino model:** Common in Asia, legal gray area in many Western markets
-- **Free-to-play with cosmetics:** Safest legally, but lower monetization
+**Decision:** NO gambling. NO cosmetics for Phase 1.
 
-**My Strong Recommendation:** Avoid real money gambling entirely. Use cosmetic monetization only. Gambling compliance is extremely complex.
+| Tier | Features |
+|------|----------|
+| Free | Unlimited play, ads (banner + interstitial) |
+| Premium | No ads, advanced stats, priority support |
 
-### 8. Scalability Requirements
-**Question:** Expected concurrent user load?
+**Pricing:** Rp 29,000/month (~$1.90) for Indonesia market
 
-**Technical Implications:**
-- 100 CCU vs 10,000 CCU vs 100,000 CCU = completely different architectures
-- Table state needs to be synchronized across servers
-- WebSocket connection pooling and load balancing
-- Database write patterns (game logs, player stats)
+### 7. Scalability: 1,000 CCU target ✅
 
-### 9. Regional Considerations
-**Question:** Target regions/markets?
+**Decision:** Initial target 1,000 concurrent users. Horizontal scaling later.
 
-**Technical Implications:**
-- Latency requirements (Asia vs Western players on same server?)
-- Localization (Chinese text, RTL considerations)
-- Data residency laws (GDPR, etc.)
-- CDN strategy
+---
 
-### 10. Existing Technical Constraints
-**Question:** Any existing team preferences or constraints?
+## MVP Feature Set (Phase 1)
 
-- Preferred tech stack?
-- Existing infrastructure?
-- Budget constraints for hosting?
-- DevOps maturity?
+### Core Gameplay
+- [ ] HK Ruleset: 3 fan minimum, standard HK scoring
+- [ ] 4-player tables: Real-time multiplayer via WebSocket
+- [ ] Private rooms: 6-digit code generation
+- [ ] Turn timer: 20s per turn (host configurable)
+- [ ] Game state sync: Server-authoritative with client prediction
 
-## Technical Architecture Concerns
+### Social Features
+- [ ] WhatsApp sharing: One-tap invite links
+- [ ] In-game emotes: 10+ preset reactions
+- [ ] Global chat: Lobby chat with moderation
+- [ ] Friend system: Add players, see online status
+
+### Authentication
+- [ ] Google Sign-In (primary)
+- [ ] Phone/WhatsApp OTP (alternative)
+- [ ] Guest play (3-game limit)
+
+### Monetization
+- [ ] Google AdMob/AdSense integration
+- [ ] Subscription: Remove ads + basic stats
+- [ ] Local payment: GoPay, OVO, Dana, LinkAja
+
+### Localization
+- [ ] Bahasa Indonesia (full UI)
+- [ ] English (fallback)
+- [ ] Cultural emotes/chat phrases
+
+### Technical Infrastructure
+- [ ] PWA: Installable, offline detection
+- [ ] Singapore backend: <30ms latency
+- [ ] Reconnection: Resume dropped games
+- [ ] Graceful degradation: Handle poor connections
+
+### Out of Scope (Phase 2+)
+- ❌ AI opponents
+- ❌ Ranked/ELO system
+- ❌ Cosmetics shop
+- ❌ Tournament system
+- ❌ Voice chat
+- ❌ Multiple variants
+- ❌ Native mobile apps
+
+---
+
+## Open Technical Questions for Implementation
 
 ### Game State Management
-- Must be server-authoritative (prevent cheating)
-- Game state serialization for crash recovery
-- Replay system for dispute resolution
-- Handling disconnections gracefully
+1. How granular should the game state be stored in Redis? (Every action vs periodic snapshots)
+2. Replay system: JSON format for game logs? Storage cost estimate?
 
 ### Real-Time Communication
-- WebSocket vs WebRTC vs SSE?
-- Message ordering guarantees
-- Handling network partitions
-- Reconnection storm protection
+1. WebSocket library: Gorilla vs native Go websockets?
+2. Message protocol: JSON vs binary (protobuf) for efficiency?
+3. How to handle WebSocket reconnection with missed events?
 
 ### Database Design
-- Player profiles and stats
-- Game history and replay data
-- Leaderboards (materialized views?)
-- Real-time vs batch analytics
+1. Player stats: Aggregate in real-time or batch job?
+2. Game history retention: 30 days? 90 days? Forever?
+3. Leaderboards: Redis Sorted Sets vs PostgreSQL materialized views?
 
-### Security Concerns
-- Bot detection
-- Collusion detection (players communicating outside game)
-- Rate limiting on table creation
-- Input validation for all game actions
+### Security & Anti-Cheat
+1. Rate limiting: Actions per minute per player?
+2. Collusion detection: IP tracking sufficient or need behavior analysis?
+3. Input validation: How strict on client payloads?
 
-## Initial Architecture Recommendation (Subject to Clarification)
+### WhatsApp Integration
+1. WhatsApp Business API or click-to-chat deep links?
+2. Invite link format: 6-digit codes vs UUIDs?
 
-**Stack:**
-- Backend: Node.js with TypeScript + Socket.io (WebSocket abstraction)
-- Frontend: React with TypeScript
-- Database: PostgreSQL (game state), Redis (session/cache/leaderboards)
-- Hosting: Vercel/Netlify (frontend), Railway/Render (backend) for MVP
+### Ads
+1. Frequency caps: Max 1 interstitial per 5 minutes?
+2. Preroll ads or only post-game?
 
-**Why:**
-- Fastest time to market
-- Good ecosystem for real-time games
-- Scales reasonably well to moderate loads
-- TypeScript reduces bugs in game logic
+---
 
-## Open Technical Questions
-1. What's the budget for infrastructure?
-2. What's the timeline for MVP?
-3. Do we need replay functionality?
-4. How do we handle table chat?
-5. What about spectator mode?
-6. Anti-cheat requirements?
+## Initial Architecture (Draft)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        CLIENT                               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   React TS   │  │   Zustand    │  │ Framer Motion│      │
+│  │   (Vite)     │──│  (Game State)│──│ (Animations) │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│         │                                                   │
+│    WebSocket / HTTP                                         │
+└─────────┼───────────────────────────────────────────────────┘
+          │
+┌─────────┼───────────────────────────────────────────────────┐
+│         ▼                                                   │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │              LOAD BALANCER (AWS ALB)                │    │
+│  └────────────────────┬───────────────────────────────┘    │
+│                       │                                      │
+│         ┌─────────────┼─────────────┐                       │
+│         ▼             ▼             ▼                       │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                │
+│  │ Go API   │  │ Go API   │  │ Go API   │                │
+│  │ Server 1 │  │ Server 2 │  │ Server N │                │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘                │
+│       └─────────────┼─────────────┘                       │
+│                     │                                      │
+│  ┌──────────────────┼──────────────────┐                 │
+│  │                  ▼                   │                 │
+│  │  ┌──────────┐  ┌──────────┐  ┌───────┴──┐             │
+│  │  │PostgreSQL│  │  Redis   │  │  Redis   │             │
+│  │  │(Game DB) │  │(Session) │  │(Cache/WS)│             │
+│  │  └──────────┘  └──────────┘  └──────────┘             │
+│  │                                                       │
+│  │           SINGAPORE REGION (ap-southeast-1)             │
+│  └────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Implementation Priority
+
+### Sprint 1: Foundation
+- Project setup (Vite + React + TS)
+- Basic UI layout (lobby, game table)
+- Tile rendering system
+- WebSocket connection
+
+### Sprint 2: Game Logic
+- HK rules engine
+- Game state management
+- Player actions (draw, discard, claim)
+- Turn timer
+
+### Sprint 3: Multiplayer
+- Room creation/joining
+- WhatsApp sharing
+- Real-time sync
+- Reconnection handling
+
+### Sprint 4: Polish & Monetization
+- Animations (Framer Motion)
+- Ad integration
+- Subscription flow
+- Indonesian localization
+
+---
+
+*Last updated: March 23, 2026 by Coder Agent*
